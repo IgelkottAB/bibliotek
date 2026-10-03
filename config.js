@@ -1,3 +1,2 @@
-// Lägg in dina Supabase-uppgifter här.
-window.SUPABASE_URL = "https://eeksadrflvbnojcgikgv.supabase.co";
-window.SUPABASE_PUBLISHABLE_KEY = "sb_publishable_vLyNAe5Eel-xXrE6MAlOMg_pktV5pZV";
+window.SUPABASE_URL = "DIN_SUPABASE_URL";
+window.SUPABASE_PUBLISHABLE_KEY = "DIN_SUPABASE_PUBLISHABLE_KEY";
