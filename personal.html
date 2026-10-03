@@ -1,5 +1,4 @@
 <!doctype html>
-
 <html lang="sv">
 <head>
 <meta charset="utf-8">
@@ -18,78 +17,107 @@
 <main id="app"></main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
 <script src="config.js"></script>
-
 <script src="app.js"></script>
 
 <script>
+
 const app = document.getElementById("app");
+
 let staff = null;
 
-/* =========================
-   PERSONALINLOGGNING
-========================= */
+
+/* =========================================================
+   LOGIN
+========================================================= */
 
 function loginBox(){
+
   app.innerHTML = `
-    <section class="panel">
-      <h1>Personalinloggning</h1>
 
-      <div class="form">
-        <input
-          id="u"
-          type="email"
-          class="input"
-          placeholder="E-post"
-          autocomplete="username"
-        >
+  <section class="panel">
 
-        <input
-          id="p"
-          type="password"
-          class="input"
-          placeholder="Lösenord"
-          autocomplete="current-password"
-        >
+    <h1>🧑‍💼 Personal</h1>
 
-        <button class="btn" onclick="login()">
-          LOGGA IN
-        </button>
+    <p>
+      Logga in med bibliotekets personalkonto.
+    </p>
 
-        <div id="m" class="msg hidden"></div>
-      </div>
-    </section>
+    <div class="form">
+
+      <input
+        id="email"
+        class="input"
+        type="email"
+        placeholder="E-post"
+        autocomplete="username"
+      >
+
+      <input
+        id="password"
+        class="input"
+        type="password"
+        placeholder="Lösenord"
+        autocomplete="current-password"
+      >
+
+      <button class="btn" onclick="login()">
+        LOGGA IN
+      </button>
+
+      <div id="loginMessage" class="msg hidden"></div>
+
+    </div>
+
+  </section>
+
   `;
+
 }
 
+
+/* =========================================================
+   LOGGA IN
+========================================================= */
+
 async function login(){
+
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
+
+  const message = document.getElementById("loginMessage");
+
   try{
-    const email = document.getElementById("u").value.trim();
-    const password = document.getElementById("p").value;
 
     if(!email || !password){
       throw new Error("Fyll i e-post och lösenord.");
     }
 
-    const {data,error} = await db.auth.signInWithPassword({
-      email: email,
-      password: password
-    });
+    const {data,error} =
+      await db.auth.signInWithPassword({
+        email,
+        password
+      });
 
     if(error) throw error;
 
-    const {data:profile,error:profileError} = await db
-      .from("profiles")
-      .select("id,full_name,role")
-      .eq("id",data.user.id)
-      .single();
+    const {data:profile,error:profileError} =
+      await db
+        .from("profiles")
+        .select("id,full_name,role")
+        .eq("id",data.user.id)
+        .single();
 
     if(profileError) throw profileError;
 
     if(profile.role !== "personal"){
+
       await db.auth.signOut();
-      throw new Error("Det här kontot är inte ett personalkonto.");
+
+      throw new Error(
+        "Det här kontot är inte ett personalkonto."
+      );
+
     }
 
     staff = profile;
@@ -97,402 +125,719 @@ async function login(){
     render();
 
   }catch(e){
+
     msg(
-      document.getElementById("m"),
+      message,
       e.message,
       "error"
     );
+
   }
+
 }
 
-/* =========================
-   LOGGA UT
-========================= */
 
-async function logout(){
-  await db.auth.signOut();
-  staff = null;
-  render();
-}
-
-/* =========================
+/* =========================================================
    KONTROLLERA INLOGGNING
-========================= */
+========================================================= */
 
 async function checkStaff(){
 
-  const {data,error} = await db.auth.getSession();
+  const {data} = await db.auth.getSession();
 
-  if(error || !data.session){
-    staff = null;
+  if(!data.session){
+
     loginBox();
-    return;
+
+    return false;
+
   }
 
-  const user = data.session.user;
+  const {data:profile,error} =
+    await db
+      .from("profiles")
+      .select("id,full_name,role")
+      .eq("id",data.session.user.id)
+      .single();
 
-  const {data:profile,error:profileError} = await db
-    .from("profiles")
-    .select("id,full_name,role")
-    .eq("id",user.id)
-    .single();
+  if(error || !profile || profile.role !== "personal"){
 
-  if(profileError || !profile || profile.role !== "personal"){
     await db.auth.signOut();
-    staff = null;
+
     loginBox();
-    return;
+
+    return false;
+
   }
 
   staff = profile;
-  render();
+
+  return true;
+
 }
 
-/* =========================
-   PERSONALSIDAN
-========================= */
 
-function render(){
+/* =========================================================
+   LOGGA UT
+========================================================= */
 
-  if(!staff){
-    loginBox();
-    return;
-  }
+async function logout(){
+
+  await db.auth.signOut();
+
+  staff = null;
+
+  loginBox();
+
+}
+
+
+/* =========================================================
+   HUVUDSIDAN
+========================================================= */
+
+async function render(){
 
   app.innerHTML = `
+
+  <section class="panel">
+
     <div class="buttons">
-      <h1 style="margin-right:auto">
-        Personal
-      </h1>
 
-      <button class="btn secondary" onclick="logout()">
-        Logga ut
-      </button>
-    </div>
+      <div style="margin-right:auto">
 
-    <div class="grid">
+        <h1 style="margin:0">
+          🧑‍💼 Personal
+        </h1>
 
-      <section class="panel">
-        <h2>📟 Skanna en bok</h2>
-
-        <p>
-          Använd Netum-skannern.
-          Här kan du söka efter en bok med streckkod.
+        <p class="muted">
+          Inloggad som ${esc(staff.full_name || "Bibliotekspersonal")}
         </p>
-
-        <div class="form">
-
-          <input
-            id="searchbc"
-            class="input barcode"
-            placeholder="Skanna streckkod"
-            onkeydown="if(event.key==='Enter')searchBook()"
-          >
-
-          <button class="btn" onclick="searchBook()">
-            SÖK
-          </button>
-
-        </div>
-
-        <div id="result"></div>
-      </section>
-
-
-      <section class="panel">
-
-        <h2>➕ Lägg till bok</h2>
-
-        <div class="form">
-
-          <input
-            id="bc"
-            class="input barcode"
-            placeholder="Streckkod"
-          >
-
-          <input
-            id="title"
-            class="input"
-            placeholder="Titel"
-          >
-
-          <input
-            id="author"
-            class="input"
-            placeholder="Författarinitialer"
-          >
-
-          <input
-            id="shelf"
-            class="input"
-            placeholder="Hyllplan"
-          >
-
-          <input
-            id="aisle"
-            class="input"
-            placeholder="Gång"
-          >
-
-          <button
-            class="btn green"
-            onclick="add()"
-          >
-            LÄGG TILL BOK
-          </button>
-
-          <div id="am" class="msg hidden"></div>
-
-        </div>
-
-      </section>
-
-
-      <section class="panel">
-
-        <h2>📋 Aktiva lån</h2>
-
-        <button
-          class="btn"
-          onclick="loans()"
-        >
-          VISA UTLÅN
-        </button>
-
-        <div id="out"></div>
-
-      </section>
-
-
-      <section class="panel">
-
-        <h2>💻 Datorer</h2>
-
-        <p>
-          Öppna sidan för att låsa eller låsa upp
-          bibliotekets lånedatorer.
-        </p>
-
-        <a
-          class="btn"
-          href="datorlas.html"
-        >
-          ÖPPNA DATORLÅS
-        </a>
-
-      </section>
-
-    </div>
-  `;
-}
-
-
-/* =========================
-   SÖK BOK
-========================= */
-
-async function searchBook(){
-
-  try{
-
-    const barcode =
-      document.getElementById("searchbc").value.trim();
-
-    if(!barcode){
-      throw new Error("Skanna eller skriv in en streckkod.");
-    }
-
-    const b = await findBook(barcode);
-
-    if(!b){
-
-      result.innerHTML =
-        '<div class="msg error">Boken hittades inte.</div>';
-
-      return;
-    }
-
-    result.innerHTML = `
-      <div class="book">
-
-        <strong>${esc(b.title)}</strong>
-
-        <span>
-          ${esc(b.author_initials || "")}
-        </span>
-
-        <br>
-
-        Streckkod:
-        <span class="barcode">
-          ${esc(b.barcode)}
-        </span>
-
-        <br>
-
-        Hyllplan:
-        ${esc(b.shelf || "-")}
-
-        ·
-
-        ${esc(b.aisle || "-")}
-
-        <br>
-
-        Status:
-        <b>
-          ${b.available ? "Ledig" : "Utlånad"}
-        </b>
 
       </div>
-    `;
 
-  }catch(e){
+      <button class="btn secondary" onclick="logout()">
+        LOGGA UT
+      </button>
 
-    document.getElementById("result").innerHTML =
-      `<div class="msg error">${esc(e.message)}</div>`;
+    </div>
 
-  }
+  </section>
+
+
+  <!-- =====================================================
+       NY LÅNTAGARE
+  ====================================================== -->
+
+  <section class="panel">
+
+    <h2>➕ Ny låntagare</h2>
+
+    <p class="muted">
+      Skapa ett nytt lånekort.
+      Skanna streckkoden med Netum-skannern i fältet för lånekortsnummer.
+    </p>
+
+    <div class="form">
+
+      <label>
+        Namn
+        <input
+          id="newName"
+          class="input"
+          type="text"
+          placeholder="För- och efternamn"
+        >
+      </label>
+
+
+      <label>
+        Personnummer
+        <input
+          id="newPersonnummer"
+          class="input"
+          type="text"
+          inputmode="numeric"
+          placeholder="ÅÅMMDDNNNN"
+        >
+      </label>
+
+
+      <label>
+        Lånekortsnummer / streckkod
+        <input
+          id="newCard"
+          class="input"
+          type="text"
+          inputmode="numeric"
+          autocomplete="off"
+          placeholder="Skanna streckkoden här"
+        >
+      </label>
+
+
+      <label>
+        E-post
+        <input
+          id="newEmail"
+          class="input"
+          type="email"
+          placeholder="Valfritt"
+        >
+      </label>
+
+
+      <label>
+        Telefon
+        <input
+          id="newPhone"
+          class="input"
+          type="tel"
+          placeholder="Valfritt"
+        >
+      </label>
+
+
+      <button class="btn" onclick="createMember()">
+        SKAPA LÅNEKORT
+      </button>
+
+
+      <div id="memberMessage" class="msg hidden"></div>
+
+    </div>
+
+  </section>
+
+
+  <!-- =====================================================
+       BOKSÖKNING
+  ====================================================== -->
+
+  <section class="panel">
+
+    <h2>🔎 Sök bok</h2>
+
+    <div class="form">
+
+      <input
+        id="bookBarcode"
+        class="input"
+        type="text"
+        inputmode="numeric"
+        placeholder="Skanna eller skriv streckkod"
+        autocomplete="off"
+      >
+
+      <button class="btn secondary" onclick="searchBook()">
+        SÖK
+      </button>
+
+      <div id="bookMessage" class="msg hidden"></div>
+
+      <div id="bookResult"></div>
+
+    </div>
+
+  </section>
+
+
+  <!-- =====================================================
+       LÄGG TILL BOK
+  ====================================================== -->
+
+  <section class="panel">
+
+    <h2>📚 Lägg till bok</h2>
+
+    <div class="form">
+
+      <input
+        id="addBarcode"
+        class="input"
+        type="text"
+        inputmode="numeric"
+        placeholder="Streckkod"
+      >
+
+      <input
+        id="addTitle"
+        class="input"
+        type="text"
+        placeholder="Boktitel"
+      >
+
+      <input
+        id="addAuthor"
+        class="input"
+        type="text"
+        placeholder="Författarinitialer"
+      >
+
+      <input
+        id="addShelf"
+        class="input"
+        type="text"
+        placeholder="Hylla"
+      >
+
+      <input
+        id="addAisle"
+        class="input"
+        type="text"
+        placeholder="Gång"
+      >
+
+      <button class="btn" onclick="addBook()">
+        LÄGG TILL BOK
+      </button>
+
+      <div id="addBookMessage" class="msg hidden"></div>
+
+    </div>
+
+  </section>
+
+
+  <!-- =====================================================
+       AKTIVA LÅN
+  ====================================================== -->
+
+  <section class="panel">
+
+    <div class="buttons">
+
+      <h2 style="margin-right:auto">
+        📖 Aktiva lån
+      </h2>
+
+      <button
+        class="btn secondary"
+        onclick="loadLoans()"
+      >
+        UPPDATERA
+      </button>
+
+    </div>
+
+    <div id="loansResult">
+      Laddar...
+    </div>
+
+  </section>
+
+
+  <!-- =====================================================
+       DATORLÅS
+  ====================================================== -->
+
+  <section class="panel">
+
+    <h2>💻 Lånedatorer</h2>
+
+    <p>
+      Hantera bibliotekets lånedatorer.
+    </p>
+
+    <a
+      class="btn"
+      href="datorlas.html"
+      style="display:inline-block;text-decoration:none"
+    >
+      ÖPPNA DATORLÅS
+    </a>
+
+  </section>
+
+  `;
+
+
+  loadLoans();
+
 }
 
 
-/* =========================
-   VISA AKTIVA LÅN
-========================= */
+/* =========================================================
+   SKAPA NY LÅNTAGARE
+========================================================= */
 
-async function loans(){
+async function createMember(){
+
+  const name =
+    document.getElementById("newName").value.trim();
+
+  const personnummer =
+    document.getElementById("newPersonnummer").value.trim();
+
+  const card =
+    document.getElementById("newCard").value.trim();
+
+  const email =
+    document.getElementById("newEmail").value.trim();
+
+  const phone =
+    document.getElementById("newPhone").value.trim();
+
+  const message =
+    document.getElementById("memberMessage");
+
 
   try{
 
-    const {data,error} = await db
-      .from("loans")
-      .select(`
-        id,
-        barcode,
-        borrowed_at,
-        due_date,
-        members(name,card_number),
-        books(title,author_initials)
-      `)
-      .is("returned_at",null)
-      .order("due_date");
-
-    if(error) throw error;
-
-    document.getElementById("out").innerHTML = `
-      <table>
-
-        <tr>
-          <th>Bok</th>
-          <th>Låntagare</th>
-          <th>Kort</th>
-          <th>Förfaller</th>
-        </tr>
-
-        ${(data || []).map(x => `
-          <tr>
-
-            <td>
-              ${esc(x.books?.title)}
-            </td>
-
-            <td>
-              ${esc(x.members?.name)}
-            </td>
-
-            <td>
-              ${esc(x.members?.card_number)}
-            </td>
-
-            <td>
-              ${esc(x.due_date)}
-            </td>
-
-          </tr>
-        `).join("")}
-
-      </table>
-    `;
-
-  }catch(e){
-
-    document.getElementById("out").innerHTML =
-      `<div class="msg error">${esc(e.message)}</div>`;
-
-  }
-}
-
-
-/* =========================
-   LÄGG TILL BOK
-========================= */
-
-async function add(){
-
-  try{
-
-    const barcode =
-      document.getElementById("bc").value.trim();
-
-    const titleValue =
-      document.getElementById("title").value.trim();
-
-    const authorValue =
-      document.getElementById("author").value.trim();
-
-    const shelfValue =
-      document.getElementById("shelf").value.trim();
-
-    const aisleValue =
-      document.getElementById("aisle").value.trim();
-
-    if(!barcode || !titleValue){
-      throw new Error("Fyll i minst streckkod och titel.");
+    if(!name){
+      throw new Error("Fyll i namn.");
     }
 
-    const {error} = await db
-      .from("books")
-      .insert({
-        barcode: barcode,
-        title: titleValue,
-        author_initials: authorValue,
-        shelf: shelfValue,
-        aisle: aisleValue,
-        available: true
-      });
+    if(!personnummer){
+      throw new Error("Fyll i personnummer.");
+    }
+
+    if(!card){
+      throw new Error(
+        "Skanna lånekortets streckkod."
+      );
+    }
+
+
+    const {data,error} =
+      await db.rpc(
+        "create_library_member",
+        {
+          p_name: name,
+          p_card_number: card,
+          p_personnummer: personnummer,
+          p_email: email || null,
+          p_phone: phone || null
+        }
+      );
+
 
     if(error) throw error;
 
+
     msg(
-      document.getElementById("am"),
-      "Boken är tillagd.",
+      message,
+      "Låntagaren skapades! Lånekortsnummer: " + card,
       "success"
     );
 
-    document.getElementById("bc").value = "";
-    document.getElementById("title").value = "";
-    document.getElementById("author").value = "";
-    document.getElementById("shelf").value = "";
-    document.getElementById("aisle").value = "";
+
+    document.getElementById("newName").value = "";
+    document.getElementById("newPersonnummer").value = "";
+    document.getElementById("newCard").value = "";
+    document.getElementById("newEmail").value = "";
+    document.getElementById("newPhone").value = "";
+
 
   }catch(e){
 
     msg(
-      document.getElementById("am"),
+      message,
       e.message,
       "error"
     );
 
   }
+
 }
 
 
-/* =========================
-   STARTA
-========================= */
+/* =========================================================
+   SÖK BOK
+========================================================= */
 
-checkStaff();
+async function searchBook(){
+
+  const barcode =
+    document.getElementById("bookBarcode")
+      .value.trim();
+
+  const message =
+    document.getElementById("bookMessage");
+
+  const result =
+    document.getElementById("bookResult");
+
+
+  try{
+
+    if(!barcode){
+      throw new Error(
+        "Skanna eller skriv en streckkod."
+      );
+    }
+
+
+    const book =
+      await findBook(barcode);
+
+
+    if(!book){
+
+      result.innerHTML = `
+        <div class="msg error">
+          Ingen bok hittades med den streckkoden.
+        </div>
+      `;
+
+      return;
+
+    }
+
+
+    result.innerHTML = `
+
+      <div class="book">
+
+        <strong>
+          ${esc(book.title)}
+        </strong>
+
+        <br>
+
+        <span>
+          Författarinitialer:
+          ${esc(book.author_initials || "-")}
+        </span>
+
+        <br>
+
+        <span>
+          Hylla:
+          ${esc(book.shelf || "-")}
+        </span>
+
+        <br>
+
+        <span>
+          Gång:
+          ${esc(book.aisle || "-")}
+        </span>
+
+        <br>
+
+        <span class="tag">
+          ${book.available ? "Tillgänglig" : "Utlånad"}
+        </span>
+
+      </div>
+
+    `;
+
+
+    message.className = "msg hidden";
+
+
+  }catch(e){
+
+    msg(
+      message,
+      e.message,
+      "error"
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   LÄGG TILL BOK
+========================================================= */
+
+async function addBook(){
+
+  const barcode =
+    document.getElementById("addBarcode")
+      .value.trim();
+
+  const title =
+    document.getElementById("addTitle")
+      .value.trim();
+
+  const author =
+    document.getElementById("addAuthor")
+      .value.trim();
+
+  const shelf =
+    document.getElementById("addShelf")
+      .value.trim();
+
+  const aisle =
+    document.getElementById("addAisle")
+      .value.trim();
+
+  const message =
+    document.getElementById("addBookMessage");
+
+
+  try{
+
+    if(!barcode){
+      throw new Error("Fyll i streckkod.");
+    }
+
+    if(!title){
+      throw new Error("Fyll i boktitel.");
+    }
+
+
+    const {error} =
+      await db
+        .from("books")
+        .insert({
+          barcode,
+          title,
+          author_initials: author || null,
+          shelf: shelf || null,
+          aisle: aisle || null,
+          available: true
+        });
+
+
+    if(error) throw error;
+
+
+    msg(
+      message,
+      "Boken har lagts till.",
+      "success"
+    );
+
+
+    document.getElementById("addBarcode").value = "";
+    document.getElementById("addTitle").value = "";
+    document.getElementById("addAuthor").value = "";
+    document.getElementById("addShelf").value = "";
+    document.getElementById("addAisle").value = "";
+
+
+  }catch(e){
+
+    msg(
+      message,
+      e.message,
+      "error"
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   VISA AKTIVA LÅN
+========================================================= */
+
+async function loadLoans(){
+
+  const result =
+    document.getElementById("loansResult");
+
+  if(!result) return;
+
+
+  result.innerHTML = "Laddar...";
+
+
+  try{
+
+    const {data,error} =
+      await db
+        .from("loans")
+        .select(`
+          id,
+          barcode,
+          borrowed_at,
+          due_date,
+          renew_count,
+          members(name,card_number),
+          books(title,author_initials)
+        `)
+        .is("returned_at",null)
+        .order("due_date");
+
+
+    if(error) throw error;
+
+
+    if(!data?.length){
+
+      result.innerHTML =
+        "<p>Det finns inga aktiva lån.</p>";
+
+      return;
+
+    }
+
+
+    result.innerHTML = data.map(l => `
+
+      <div class="book">
+
+        <strong>
+          ${esc(l.books?.title || "Okänd bok")}
+        </strong>
+
+        <br>
+
+        <span>
+          Låntagare:
+          ${esc(l.members?.name || "-")}
+        </span>
+
+        <br>
+
+        <span>
+          Lånekort:
+          ${esc(l.members?.card_number || "-")}
+        </span>
+
+        <br>
+
+        <span>
+          Förfaller:
+          <b>${esc(l.due_date)}</b>
+        </span>
+
+        <br>
+
+        <span class="tag">
+          Omlån: ${Number(l.renew_count || 0)} / 2
+        </span>
+
+      </div>
+
+    `).join("");
+
+
+  }catch(e){
+
+    result.innerHTML = `
+
+      <div class="msg error">
+        ${esc(e.message)}
+      </div>
+
+    `;
+
+  }
+
+}
+
+
+/* =========================================================
+   START
+========================================================= */
+
+checkStaff().then(ok => {
+
+  if(ok){
+    render();
+  }
+
+});
+
 
 </script>
 
