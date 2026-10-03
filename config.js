@@ -1,0 +1,3 @@
+// Lägg in dina Supabase-uppgifter här.
+window.SUPABASE_URL = "KLISTRA_IN_SUPABASE_URL_HÄR";
+window.SUPABASE_PUBLISHABLE_KEY = "KLISTRA_IN_SUPABASE_PUBLISHABLE_KEY_HÄR";

@@ -1,0 +1,22 @@
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f6f8;color:#17212b}
+header{min-height:64px;background:#173b57;color:white;display:flex;align-items:center;justify-content:space-between;padding:12px 24px;font-size:20px}
+main{max-width:1100px;margin:30px auto;padding:0 18px}.home{text-align:center}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;margin-top:30px}
+.card,.panel{background:white;border-radius:16px;padding:24px;box-shadow:0 4px 18px #0001}
+.card{display:flex;flex-direction:column;gap:10px;text-decoration:none;color:inherit;min-height:190px;justify-content:center;transition:.15s}
+.card:hover{transform:translateY(-2px)}.card span{font-size:48px}.card b{font-size:22px}.card small{color:#667}
+.buttons{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.btn{border:0;border-radius:10px;padding:13px 18px;font-weight:bold;cursor:pointer;background:#173b57;color:white}
+.btn.secondary{background:#dce7ee;color:#173b57}.btn.danger{background:#a93232;color:white}.btn.green{background:#247a43}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px}
+.form{display:grid;gap:10px;max-width:520px}.input{padding:13px;border:1px solid #c7d0d7;border-radius:9px;font-size:16px;width:100%}
+.msg{padding:13px;border-radius:10px;background:#eef5fa;margin:12px 0}.error{background:#ffe9e9;color:#8b2020}.success{background:#e8f7ec;color:#17612e}
+.hidden{display:none}.book{border:1px solid #dde4e9;border-radius:12px;padding:14px;background:white;margin:8px 0}
+.book strong{display:block;font-size:18px}.muted{color:#667}.tag{display:inline-block;padding:4px 8px;border-radius:999px;background:#e7eef3;font-size:12px}
+.dangerText{color:#a93232}table{width:100%;border-collapse:collapse;background:white;border-radius:12px;overflow:hidden}
+th,td{padding:12px;border-bottom:1px solid #e4e8eb;text-align:left}th{background:#edf3f7}
+.barcode{font-family:monospace;letter-spacing:1px}.big{font-size:28px;font-weight:bold}
+.status-open{color:#17612e;font-weight:bold}.status-locked{color:#a93232;font-weight:bold}
+.notice{padding:16px;border-radius:12px;background:#fff8dc;margin:15px 0}
+@media(max-width:600px){header{font-size:16px;padding:12px}main{margin:18px auto}.cards{grid-template-columns:1fr}th,td{padding:9px;font-size:14px}}

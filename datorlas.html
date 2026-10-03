@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="sv"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Datorlås – Igelkotts Biblioteken</title><link rel="stylesheet" href="style.css"></head>
+<body><header><b>📚 IGELKOTTS BIBLIOTEKEN</b><span>Datorlås</span></header><main id="app"></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="config.js"></script><script src="app.js"></script>
+<script>
+const app=document.getElementById("app");let staff=localStorage.getItem("library_staff");
+function login(){const u=document.getElementById("u").value.trim(),p=document.getElementById("p").value;if(u==="personal"&&p===""){msg(m,"Skriv lösenordet som biblioteket har valt.","error");return}
+db.rpc("library_staff_login",{p_username:u,p_password:p}).then(({data,error})=>{if(error||!data?.length){msg(m,error?.message||"Fel inloggning.","error");return}localStorage.setItem("library_staff",JSON.stringify(data[0]));staff=data[0];show()})}
+async function show(){if(!staff){app.innerHTML=`<section class="panel"><h1>🔐 Personalinloggning</h1><p>Logga in för att ändra datorernas låsstatus.</p><div class="form"><input id="u" class="input" placeholder="Användarnamn"><input id="p" type="password" class="input" placeholder="Lösenord"><button class="btn" onclick="login()">LOGGA IN</button><div id="m" class="msg hidden"></div></div></section>`;return}
+try{const {data,error}=await db.from("library_computers").select("*").order("computer_no");if(error)throw error;
+app.innerHTML=`<section class="panel"><div class="buttons"><h1 style="margin-right:auto">💻 Datorlås</h1><button class="btn secondary" onclick="logout()">Logga ut</button></div>
+<p>Här ändrar personalen om en bibliotekets lånedator ska vara öppen eller låst.</p><div id="m" class="msg hidden"></div>
+<div class="grid">${(data||[]).map(c=>`<div class="card"><span>💻</span><b>Dator ${esc(c.computer_no)}</b><span class="${c.locked?'status-locked':'status-open'}">${c.locked?'🔒 LÅST':'🟢 ÖPPEN'}</span>
+<button class="btn ${c.locked?'green':'danger'}" onclick="toggle(${c.id},${!c.locked})">${c.locked?'LÅS UPP':'LÅS DATORN'}</button></div>`).join("")}</div></section>`}catch(e){app.innerHTML=`<section class="panel"><div class="msg error">${esc(e.message)}</div><p>Kör den senaste schema.sql i Supabase.</p></section>`}}
+async function toggle(id,locked){const {error}=await db.from("library_computers").update({locked}).eq("id",id);if(error)alert(error.message);else show()}
+function logout(){localStorage.removeItem("library_staff");staff=null;show()}
+show();
+</script></body></html>

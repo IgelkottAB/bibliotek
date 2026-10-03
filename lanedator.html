@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="sv"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lånedator – Igelkotts Biblioteken</title><link rel="stylesheet" href="style.css"></head>
+<body><header><b>📚 IGELKOTTS BIBLIOTEKEN</b><span>Lånedator</span></header><main id="app"></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="config.js"></script><script src="app.js"></script>
+<script>
+const app=document.getElementById("app");let member=null,mode=null,items=[];
+function home(){app.innerHTML=`<section class="panel"><h1>Vad vill du göra?</h1><div class="grid">
+<button class="card" onclick="start('borrow')"><span>📚</span><b>LÅNA</b><small>Skanna böcker med Netum-skannern</small></button>
+<button class="card" onclick="start('return')"><span>📥</span><b>LÄMNA TILLBAKA</b><small>Skanna böcker du lämnar</small></button></div></section>`}
+function start(m){mode=m;items=[];app.innerHTML=`<section class="panel"><h1>${m==="borrow"?"Låna böcker":"Lämna tillbaka böcker"}</h1>
+<div class="form"><input id="card" class="input" inputmode="numeric" placeholder="Lånekortsnummer">
+<input id="pnr" class="input" inputmode="numeric" placeholder="Personnummer">
+<button class="btn" onclick="login()">FORTSÄTT</button><button class="btn secondary" onclick="home()">Tillbaka</button><div id="m" class="msg hidden"></div></div></section>`}
+async function login(){try{member=await memberLogin(card.value.trim(),pnr.value.trim());scanPage()}catch(e){msg(document.getElementById("m"),e.message,"error")}}
+function scanPage(){app.innerHTML=`<section class="panel"><h1>${mode==="borrow"?"Skanna böcker":"Skanna böcker som ska lämnas"}</h1>
+<div class="notice">📟 <b>Använd Netum-skannern.</b> Klicka i rutan nedan och skanna streckkoden. Skannern skriver numret automatiskt.</div>
+<div class="form"><input id="barcode" class="input barcode" autocomplete="off" autofocus placeholder="Skanna streckkod här">
+<button class="btn" onclick="addBook()">LÄGG TILL</button><button class="btn secondary" onclick="finish()">KLAR</button>
+<button class="btn secondary" onclick="home()">Avbryt</button></div><div id="m" class="msg hidden"></div><div id="list"></div></section>`;barcode.focus();barcode.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();addBook()}})}
+async function addBook(){const b=barcode.value.trim();if(!b)return;try{const book=await findBook(b);if(!book)throw new Error("Boken hittades inte.");if(items.some(x=>x.barcode===b))throw new Error("Boken är redan tillagd.");if(mode==="borrow"&&!book.available)throw new Error("Boken är redan utlånad.");
+items.push(book);barcode.value="";barcode.focus();renderList();msg(document.getElementById("m"),"Boken lades till.","success")}catch(e){msg(document.getElementById("m"),e.message,"error");barcode.select()}}
+function renderList(){list.innerHTML=items.map((b,i)=>`<div class="book"><strong>${esc(b.title)}</strong><span>${esc(b.author_initials||"")}</span>
+${mode==="borrow"?`<br><span class="muted">Hyllplan ${esc(b.shelf||"-")} · ${esc(b.aisle||"-")}</span>`:`<br><span>Lägg boken i återlämningslådan.</span>`}
+<br><button class="btn secondary" onclick="items.splice(${i},1);renderList();barcode.focus()">Ta bort</button></div>`).join("")}
+async function finish(){if(!items.length){alert("Du har inte lagt till någon bok.");return}
+try{if(mode==="borrow")await borrowBooks(member.id,items.map(x=>x.barcode));else await returnBooks(member.id,items.map(x=>x.barcode));
+const titles=items.map(x=>x.title);app.innerHTML=`<section class="panel"><h1>✅ Klart!</h1><p>${mode==="borrow"?"Böckerna är nu lånade.":"Böckerna är nu registrerade som återlämnade."}</p>
+${titles.map(t=>`<div class="book">${esc(t)}</div>`).join("")}<button class="btn" onclick="home()">KLAR</button></section>`}catch(e){alert(e.message)}}
+home();
+</script></body></html>
