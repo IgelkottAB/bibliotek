@@ -1,11 +1,181 @@
-const sb=supabase.createClient(window.SUPABASE_URL,window.SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true}});const $=s=>document.querySelector(s);const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));const dateSV=x=>x?new Date(x).toLocaleDateString('sv-SE'):'–';
-document.addEventListener('DOMContentLoaded',()=>{if($('#loginForm'))init()});
-async function init(){let path=location.pathname;if(path.includes('kund'))return initCustomer();return initStaffPage(path)}
-async function initCustomer(){$('#loginForm').onsubmit=async e=>{e.preventDefault();$('#msg').textContent='Loggar in...';let {data,error}=await sb.rpc('library_member_login',{p_card_no:$('#card').value.trim(),p_personnummer:$('#pnr').value.trim()});if(error||!data?.length){$('#msg').textContent=error?.message||'Fel lånekort eller personnummer.';return}sessionStorage.setItem('lib_member',JSON.stringify(data[0]));$('#login').hidden=true;$('#app').hidden=false;renderCustomer(data[0])}}
-async function renderCustomer(m){let {data,error}=await sb.rpc('get_my_loans',{p_member_id:m.member_id});if(error){$('#app').innerHTML='<div class="panel">'+esc(error.message)+'</div>';return}$('#app').innerHTML='<div class="panel"><div class="row"><div><h1>Mina lån</h1><p>Hej '+esc(m.full_name)+'</p></div><button id="out" class="secondary">Logga ut</button></div></div><div class="panel tablewrap"><table class="table"><tr><th>Bok</th><th>Författare</th><th>Hylla</th><th>Förfaller</th><th></th></tr>'+(data||[]).map(l=>'<tr><td>'+esc(l.title)+'</td><td>'+esc(l.author_initials||'')+'</td><td>'+esc(l.shelf||'')+'</td><td>'+dateSV(l.due_date)+'</td><td>'+(l.renew_count<2?'<button class="renew" data-id="'+l.id+'">Låna om</button>':'Max omlån')+'</td></tr>').join('')+'</table></div>';$('#out').onclick=()=>{sessionStorage.clear();location.reload()};document.querySelectorAll('.renew').forEach(b=>b.onclick=async()=>{let r=await sb.rpc('renew_book',{p_loan_id:Number(b.dataset.id),p_member_id:m.member_id});if(r.error)alert(r.error.message);else renderCustomer(m)})}
-async function initStaffPage(path){$('#loginForm').onsubmit=async e=>{e.preventDefault();let r=await sb.auth.signInWithPassword({email:$('#email').value,password:$('#password').value});if(r.error){$('#msg').textContent=r.error.message;return}let ok=await staff();if(!ok){$('#msg').textContent='Du har inte behörighet.';return}$('#login').hidden=true;$('#app').hidden=false;if(path.includes('personal'))renderStaff();else if(path.includes('lanedator'))renderComputers();else renderLock()}}
-async function staff(){let {data:{user}}=await sb.auth.getUser();if(!user)return false;let {data:p}=await sb.from('profiles').select('role').eq('id',user.id).single();return !!p&&['staff','admin','owner'].includes(p.role)}
-async function renderStaff(){let [{data:members},{data:books},{data:loans}]=await Promise.all([sb.from('members').select('*').order('full_name'),sb.from('books').select('*').order('title'),sb.from('loans').select('*,members(full_name),books(title)').eq('status','active').order('due_date')]);$('#app').innerHTML='<div class="row"><h1>Personal</h1><button id="out" class="secondary">Logga ut</button></div><div class="grid"><section class="panel"><h2>Ny låntagare</h2><form id="mf"><input name="card_no" placeholder="Lånekortsnummer" required><input name="full_name" placeholder="Namn" required><input name="email" placeholder="E-post"><input name="phone" placeholder="Telefon"><input name="personnummer" placeholder="Personnummer" required><button>Skapa kund</button></form></section><section class="panel"><h2>Lägg till bok</h2><form id="bf"><input name="barcode" placeholder="Streckkod"><input name="title" placeholder="Titel" required><input name="author_initials" placeholder="Författarinitialer"><input name="shelf" placeholder="Hylla"><input name="aisle" placeholder="Gång"><button>Lägg till bok</button></form></section></div><section class="panel"><h2>Utlån</h2><p class="small">Netum-skannern fungerar som tangentbord. Skanna kort och bok.</p><form id="lf"><input name="card" placeholder="Lånekort" required><input name="book" placeholder="Bokstreckkod" required><button>Låna ut</button></form></section><section class="panel tablewrap"><h2>Aktiva lån</h2><table class="table"><tr><th>Låntagare</th><th>Bok</th><th>Förfaller</th><th></th></tr>'+(loans||[]).map(l=>'<tr><td>'+esc(l.members?.full_name)+'</td><td>'+esc(l.books?.title)+'</td><td>'+dateSV(l.due_date)+'</td><td><button class="ret" data-id="'+l.id+'">Återlämna</button></td></tr>').join('')+'</table></section><section class="panel tablewrap"><h2>Böcker</h2><table class="table"><tr><th>Streckkod</th><th>Titel</th><th>Författare</th><th>Hylla</th></tr>'+(books||[]).map(b=>'<tr><td>'+esc(b.barcode)+'</td><td>'+esc(b.title)+'</td><td>'+esc(b.author_initials)+'</td><td>'+esc(b.shelf)+'</td></tr>').join('')+'</table></section>';
-$('#out').onclick=()=>{sb.auth.signOut();location.reload()};$('#mf').onsubmit=async e=>{e.preventDefault();let f=new FormData(e.target),r=await sb.rpc('create_member',{p_card_no:f.get('card_no'),p_full_name:f.get('full_name'),p_email:f.get('email')||null,p_phone:f.get('phone')||null,p_personnummer:f.get('personnummer')});if(r.error)alert(r.error.message);else renderStaff()};$('#bf').onsubmit=async e=>{e.preventDefault();let f=new FormData(e.target),r=await sb.from('books').insert({barcode:f.get('barcode')||null,title:f.get('title'),author_initials:f.get('author_initials')||null,shelf:f.get('shelf')||null,aisle:f.get('aisle')||null,available:true});if(r.error)alert(r.error.message);else renderStaff()};$('#lf').onsubmit=async e=>{e.preventDefault();let f=new FormData(e.target),r=await sb.rpc('borrow_books',{p_card_no:f.get('card'),p_barcode:f.get('book')});if(r.error)alert(r.error.message);else renderStaff()};document.querySelectorAll('.ret').forEach(b=>b.onclick=async()=>{let r=await sb.rpc('return_books',{p_loan_id:Number(b.dataset.id)});if(r.error)alert(r.error.message);else renderStaff()})}
-async function renderComputers(){let {data,error}=await sb.from('library_computers').select('*').order('computer_no');if(error){$('#app').innerHTML='<div class="panel">'+esc(error.message)+'</div>';return}$('#app').innerHTML='<div class="row"><h1>Lånedatorer</h1><button id="out" class="secondary">Logga ut</button></div><div class="grid">'+(data||[]).map(c=>'<section class="panel '+(c.locked?'locked':'free')+'"><h2>Dator '+c.computer_no+'</h2><p>'+ (c.locked?'🔒 Upptagen':'🟢 Ledig')+'</p><button class="bc" data-id="'+c.id+'">'+(c.locked?'Avsluta lån':'Låna dator')+'</button></section>').join('')+'</div>';$('#out').onclick=()=>{sb.auth.signOut();location.reload()};document.querySelectorAll('.bc').forEach(b=>b.onclick=async()=>{let c=data.find(x=>String(x.id)===b.dataset.id),name=c.locked?null:prompt('Låntagarens namn:');if(!c.locked&&!name)return;await sb.from('library_computers').update({locked:!c.locked,current_member_name:name}).eq('id',c.id);renderComputers()})}
-async function renderLock(){let {data,error}=await sb.from('library_computers').select('*').order('computer_no');if(error){$('#app').innerHTML='<div class="panel">'+esc(error.message)+'</div>';return}$('#app').innerHTML='<div class="row"><h1>Datorlås</h1><button id="out" class="secondary">Logga ut</button></div><div class="grid">'+(data||[]).map(c=>'<section class="panel '+(c.locked?'locked':'free')+'"><h2>Dator '+c.computer_no+'</h2><p>'+(c.locked?'🔒 LÅST':'🟢 UPPLÅST')+'</p><button class="tl" data-id="'+c.id+'">'+(c.locked?'Lås upp':'Lås')+'</button></section>').join('')+'</div>';$('#out').onclick=()=>{sb.auth.signOut();location.reload()};document.querySelectorAll('.tl').forEach(b=>b.onclick=async()=>{let c=data.find(x=>String(x.id)===b.dataset.id);await sb.from('library_computers').update({locked:!c.locked}).eq('id',c.id);renderLock()})}
+const { createClient } = supabase;
+
+const db = createClient(
+  window.SUPABASE_URL,
+  window.SUPABASE_PUBLISHABLE_KEY,
+  {
+    auth: {
+      persistSession: false
+    }
+  }
+);
+
+function $(id) {
+  return document.getElementById(id);
+}
+
+function esc(v) {
+  return String(v ?? "").replace(
+    /[&<>"']/g,
+    c => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#039;"
+    }[c])
+  );
+}
+
+function msg(el, text, type = "") {
+  if (!el) return;
+  el.className = "msg " + type;
+  el.textContent = text;
+  el.classList.remove("hidden");
+}
+
+function saveMember(member) {
+  localStorage.setItem("library_member", JSON.stringify(member));
+}
+
+function getMember() {
+  try {
+    return JSON.parse(localStorage.getItem("library_member"));
+  } catch {
+    return null;
+  }
+}
+
+function logoutMember() {
+  localStorage.removeItem("library_member");
+  location.href = "kund.html";
+}
+
+async function memberLogin(card, personnummer) {
+  const { data, error } = await db.rpc(
+    "library_member_login",
+    {
+      p_card: card,
+      p_personnummer: personnummer
+    }
+  );
+
+  if (error) throw error;
+
+  if (!data?.length) {
+    throw new Error("Fel lånekortsnummer eller personnummer.");
+  }
+
+  saveMember(data[0]);
+  return data[0];
+}
+
+async function getMyLoans(memberId) {
+  const { data, error } = await db.rpc(
+    "get_my_loans",
+    {
+      p_member_id: memberId
+    }
+  );
+
+  if (error) throw error;
+
+  return (data || []).map(l => ({
+    id: l.id,
+    barcode: l.barcode,
+    borrowed_at: l.borrowed_at,
+    due_date: l.due_date,
+    returned_at: l.returned_at,
+    renew_count: l.renew_count,
+    books: {
+      title: l.title,
+      author_initials: l.author_initials
+    }
+  }));
+}
+
+async function renewLoan(loanId, memberId) {
+  const { data, error } = await db.rpc(
+    "renew_book",
+    {
+      p_loan_id: loanId,
+      p_member_id: memberId
+    }
+  );
+
+  if (error) throw error;
+  return data;
+}
+
+async function findBook(barcode) {
+  const { data, error } = await db
+    .from("books")
+    .select(
+      "id,barcode,title,author_initials,shelf,aisle,available"
+    )
+    .eq("barcode", barcode)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
+async function borrowBooks(memberId, barcodes) {
+  const { data, error } = await db.rpc(
+    "borrow_books",
+    {
+      p_member_id: memberId,
+      p_barcodes: barcodes
+    }
+  );
+
+  if (error) throw error;
+  return data;
+}
+
+async function returnBooks(memberId, barcodes) {
+  const { data, error } = await db.rpc(
+    "return_books",
+    {
+      p_member_id: memberId,
+      p_barcodes: barcodes
+    }
+  );
+
+  if (error) throw error;
+  return data;
+}
+
+/*
+  Skicka kvitto via Supabase Edge Function.
+  Kunden har en tillfällig receipt_token som skapades vid login.
+*/
+async function sendReceipt(channel, mode, items) {
+  const member = getMember();
+
+  if (!member?.receipt_token) {
+    throw new Error(
+      "Kvittofunktionen behöver en ny inloggning. Logga ut och logga in igen."
+    );
+  }
+
+  const { data, error } = await db.functions.invoke(
+    "send-receipt",
+    {
+      body: {
+        receipt_token: member.receipt_token,
+        channel,
+        mode,
+        items
+      }
+    }
+  );
+
+  if (error) throw error;
+
+  if (!data?.ok) {
+    throw new Error(data?.message || "Kunde inte skicka kvittot.");
+  }
+
+  return data;
+}
